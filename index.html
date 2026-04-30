@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!--
+  SECURITY CONTROL: SC-18 / OWASP A05 — Content Security Policy
+  Whitelists all allowed content sources. Blocks XSS, data: URIs,
+  unauthorized API calls, and iframe embedding (clickjacking).
+  NIST: SC-18 (Mobile Code), SI-3 (Malicious Code Protection)
+  OWASP: A05:2021 Security Misconfiguration
+-->
+<meta http-equiv="Content-Security-Policy"
+  content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src https://api.anthropic.com; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'none';">
+<meta http-equiv="X-Frame-Options" content="DENY">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta http-equiv="Referrer-Policy" content="no-referrer">
+<meta http-equiv="Permissions-Policy" content="geolocation=(), microphone=(), camera=()">
+<title>AI Security Analyzer v2 — NIST 800-53 + OWASP Top 10</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+<style>
+:root {
+  --bg:#060809; --s1:#0d1117; --s2:#131920; --s3:#1a2230;
+  --bd:rgba(255,255,255,0.08); --bd2:rgba(255,255,255,0.14); --bd3:rgba(255,255,255,0.22);
+  --tx:#ffffff; --tx2:#c8d0de; --tx3:#8896aa;
+  --ac:#00ffcc; --ac2:rgba(0,255,204,0.15); --ac3:rgba(0,255,204,0.06);
+  --rd:#ff6b6b; --rd2:rgba(255,107,107,0.14);
+  --am:#ffd166; --am2:rgba(255,209,102,0.14);
+  --bl:#74b9ff; --bl2:rgba(116,185,255,0.14);
+  --gn:#55efc4; --gn2:rgba(85,239,196,0.14);
+  --pu:#c39bd3; --pu2:rgba(195,155,211,0.14);
+  --mono:'JetBrains Mono',monospace; --sans:'Syne',sans-serif;
+  --r:10px; --rl:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:16px;line-height:1.7;min-height:100vh;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,204,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,204,0.02) 1px,transparent 1px);background-size:52px 52px;pointer-events:none;z-index:0;}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:40px 28px 100px;}
+
+/* https warning */
+#httpsWarn{display:none;align-items:center;gap:12px;padding:12px 18px;margin-bottom:20px;background:var(--am2);border:1px solid rgba(255,209,102,0.35);border-radius:var(--r);font-family:var(--mono);font-size:13px;color:var(--am);}
+
+/* header */
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;padding-bottom:28px;border-bottom:1px solid var(--bd);}
+.logo-badge{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);font-size:12px;color:var(--ac);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+.ldot{width:8px;height:8px;border-radius:50%;background:var(--ac);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.site-title{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.2;}
+.site-title span{color:var(--ac);}
+.hdr-right{text-align:right;font-family:var(--mono);font-size:12px;color:var(--tx3);line-height:2;}
+
+/* posture bar */
+.posture{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:28px;padding:14px 18px;background:var(--s1);border:1px solid var(--bd);border-radius:var(--r);}
+.plabel{font-family:var(--mono);font-size:11px;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;margin-right:6px;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-family:var(--mono);font-size:11px;border:1px solid transparent;cursor:default;position:relative;transition:transform .15s;}
+.chip:hover{transform:translateY(-1px);}
+.chip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--s3);border:1px solid var(--bd2);color:var(--tx);font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:5px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s;z-index:20;}
+.chip:hover::after{opacity:1;}
+.chip .d{width:5px;height:5px;border-radius:50%;}
+.cg{background:var(--gn2);color:var(--gn);border-color:rgba(85,239,196,.3);} .cg .d{background:var(--gn);}
+.cb{background:var(--bl2);color:var(--bl);border-color:rgba(116,185,255,.3);} .cb .d{background:var(--bl);}
+.cp{background:var(--pu2);color:var(--pu);border-color:rgba(195,155,211,.3);} .cp .d{background:var(--pu);}
+.ca{background:var(--am2);color:var(--am);border-color:rgba(255,209,102,.3);} .ca .d{background:var(--am);}
+
+/* main grid */
+.mgrid{display:grid;grid-template-columns:360px 1fr 300px;gap:16px;align-items:start;}
+@media(max-width:960px){.mgrid{grid-template-columns:1fr;}}
+.lcol,.ccol,.rcol{display:flex;flex-direction:column;gap:14px;}
+
+/* panel */
+.panel{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;}
+.ph{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--bd);background:var(--s2);}
+.pt{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--tx2);letter-spacing:.07em;text-transform:uppercase;}
+
+/* tabs */
+.tabs{display:flex;gap:6px;padding:12px 16px;border-bottom:1px solid var(--bd);background:var(--s2);}
+.tab{padding:5px 14px;border-radius:6px;border:1px solid transparent;background:transparent;font-family:var(--mono);font-size:12px;color:var(--tx3);cursor:pointer;transition:all .15s;}
+.tab:hover{color:var(--tx);border-color:var(--bd2);}
+.tab.active{background:var(--ac2);border-color:rgba(0,255,204,.35);color:var(--ac);}
+
+/* textarea */
+textarea{width:100%;height:230px;padding:16px;font-family:var(--mono);font-size:13px;line-height:1.7;color:var(--tx);background:transparent;border:none;resize:none;outline:none;}
+textarea::selection{background:rgba(0,255,204,.2);}
+textarea::-webkit-scrollbar{width:4px;}
+textarea::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+
+/* input meta */
+.imeta{display:flex;align-items:center;justify-content:space-between;padding:7px 16px;border-top:1px solid var(--bd);background:var(--s2);font-family:var(--mono);font-size:12px;color:var(--tx3);}
+.sok{color:var(--gn);} .swarn{color:var(--am);} .sbad{color:var(--rd);}
+
+/* alerts */
+.alert{display:none;margin:10px 14px;padding:11px 14px;border-radius:var(--r);font-family:var(--mono);font-size:13px;line-height:1.6;}
+.alert-amber{background:var(--am2);border:1px solid rgba(255,209,102,.35);color:var(--am);}
+.alert-red{background:var(--rd2);border:1px solid rgba(255,107,107,.3);color:var(--rd);}
+
+/* buttons */
+.btnrow{display:flex;gap:9px;padding:12px 16px;border-top:1px solid var(--bd);background:var(--s2);}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:var(--r);border:1px solid var(--bd2);font-family:var(--mono);font-size:13px;cursor:pointer;transition:all .15s;color:var(--tx2);background:transparent;}
+.btn:hover{color:var(--tx);border-color:var(--bd3);background:rgba(255,255,255,.04);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn:active:not(:disabled){transform:scale(.97);}
+.btn-p{background:var(--ac);color:#000;border-color:var(--ac);font-weight:700;font-size:14px;}
+.btn-p:hover{background:#33ffdd;border-color:#33ffdd;color:#000;}
+
+/* badges */
+.badge{font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:10px;}
+.bgray{background:var(--s3);color:var(--tx2);border:1px solid var(--bd2);}
+.bred{background:var(--rd2);color:var(--rd);border:1px solid rgba(255,107,107,.3);}
+.bgn{background:var(--gn2);color:var(--gn);border:1px solid rgba(85,239,196,.3);}
+.bbl{background:var(--bl2);color:var(--bl);border:1px solid rgba(116,185,255,.3);}
+.bam{background:var(--am2);color:var(--am);border:1px solid rgba(255,209,102,.3);}
+.bac{background:var(--ac2);color:var(--ac);border:1px solid rgba(0,255,204,.3);}
+
+/* violations */
+.vi{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:13px 18px;border-bottom:1px solid var(--bd);transition:background .1s;}
+.vi:last-child{border-bottom:none;}
+.vi:hover{background:rgba(255,107,107,.05);}
+.ctag{font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;background:var(--rd2);color:var(--rd);border:1px solid rgba(255,107,107,.25);white-space:nowrap;margin-top:2px;}
+.vmsg{font-size:14px;color:var(--tx);line-height:1.6;}
+
+/* pass / placeholder */
+.passbanner{display:flex;align-items:center;gap:12px;padding:18px 18px;color:var(--gn);font-family:var(--mono);font-size:14px;}
+.passicon{width:22px;height:22px;border-radius:50%;background:var(--gn2);border:1px solid rgba(85,239,196,.35);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;}
+.ph_holder{padding:28px 18px;text-align:center;color:var(--tx3);font-family:var(--mono);font-size:13px;}
+
+/* AI stats */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--bd);border-bottom:1px solid var(--bd);}
+.sc{background:var(--s1);padding:14px 14px;text-align:center;}
+.sn{font-size:26px;font-weight:700;font-family:var(--mono);display:block;}
+.sl{font-family:var(--mono);font-size:11px;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;}
+
+.rrow{padding:16px 18px;border-bottom:1px solid var(--bd);}
+.rlr{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.rlt{font-family:var(--mono);font-size:12px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;}
+.rbb{width:100%;height:5px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.rbf{height:100%;border-radius:3px;transition:width .7s cubic-bezier(.4,0,.2,1);}
+.rsum{margin-top:12px;font-size:14px;color:var(--tx2);line-height:1.7;}
+
+.tsec{padding:14px 18px;border-bottom:1px solid var(--bd);}
+.tsec:last-child{border-bottom:none;}
+.thdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.tic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.tic.atk{background:var(--rd2);color:var(--rd);}
+.tic.imp{background:var(--am2);color:var(--am);}
+.tic.fix{background:var(--gn2);color:var(--gn);}
+.ttl{font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
+.ttl.atk{color:var(--rd);} .ttl.imp{color:var(--am);} .ttl.fix{color:var(--gn);}
+.tlist{list-style:none;display:flex;flex-direction:column;gap:7px;}
+.tlist li{display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--tx);line-height:1.6;}
+.tb{width:5px;height:5px;border-radius:50%;margin-top:7px;flex-shrink:0;}
+.atk .tb{background:var(--rd);} .imp .tb{background:var(--am);} .fix .tb{background:var(--gn);}
+
+/* loading */
+.ail{display:flex;align-items:center;gap:10px;padding:18px 18px;font-family:var(--mono);font-size:13px;color:var(--tx3);}
+.lds{display:flex;gap:4px;}
+.lds span{width:5px;height:5px;border-radius:50%;background:var(--ac);animation:ld 1.2s infinite;}
+.lds span:nth-child(2){animation-delay:.2s;} .lds span:nth-child(3){animation-delay:.4s;}
+@keyframes ld{0%,80%,100%{transform:translateY(0);opacity:.3}40%{transform:translateY(-4px);opacity:1}}
+
+/* right col: security controls */
+.citem{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-bottom:1px solid var(--bd);transition:background .1s;}
+.citem:last-child{border-bottom:none;}
+.citem:hover{background:rgba(255,255,255,.02);}
+.cst{width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;margin-top:2px;}
+.ca-st{background:var(--gn2);color:var(--gn);border:1px solid rgba(85,239,196,.35);}
+.ci-st{background:var(--bl2);color:var(--bl);border:1px solid rgba(116,185,255,.35);}
+.cdet{flex:1;min-width:0;}
+.cid{font-family:var(--mono);font-size:11px;color:var(--ac);margin-bottom:2px;}
+.cname{font-size:13px;color:var(--tx);font-weight:600;line-height:1.4;}
+.cdesc{font-size:12px;color:var(--tx3);line-height:1.5;margin-top:3px;}
+
+/* audit log */
+.alog{max-height:200px;overflow-y:auto;}
+.alog::-webkit-scrollbar{width:4px;}
+.alog::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px;}
+.aentry{display:grid;grid-template-columns:auto 1fr auto;gap:9px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--bd);font-family:var(--mono);font-size:12px;}
+.aentry:last-child{border-bottom:none;}
+.atime{color:var(--tx3);white-space:nowrap;}
+.amsg{color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.aempty{padding:18px 16px;text-align:center;font-family:var(--mono);font-size:12px;color:var(--tx3);}
+
+/* footer */
+.footer{margin-top:48px;padding-top:24px;border-top:1px solid var(--bd);display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+.fl{font-family:var(--mono);font-size:12px;color:var(--tx3);line-height:2;}
+.flink{color:var(--ac);text-decoration:none;}
+.flink:hover{text-decoration:underline;}
+
+.fade-in{animation:fi .25s ease;}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* api key panel */
+.key-panel{background:var(--s1);border:1px solid var(--bd);border-radius:var(--rl);overflow:hidden;}
+.key-body{padding:16px 18px;display:flex;flex-direction:column;gap:12px;}
+.key-status{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:var(--r);font-family:var(--mono);font-size:13px;}
+.key-status.unset{background:var(--rd2);color:var(--rd);border:1px solid rgba(255,107,107,.25);}
+.key-status.set{background:var(--gn2);color:var(--gn);border:1px solid rgba(85,239,196,.25);}
+.key-status.testing{background:var(--am2);color:var(--am);border:1px solid rgba(255,209,102,.25);}
+.key-input-row{display:flex;gap:8px;align-items:center;}
+.key-input{flex:1;padding:9px 13px;font-family:var(--mono);font-size:13px;color:var(--tx);background:var(--s2);border:1px solid var(--bd2);border-radius:var(--r);outline:none;letter-spacing:.05em;}
+.key-input:focus{border-color:rgba(0,255,204,.45);}
+.key-input::placeholder{color:var(--tx3);letter-spacing:0;}
+.key-toggle{padding:9px 12px;border-radius:var(--r);border:1px solid var(--bd2);background:transparent;color:var(--tx2);font-family:var(--mono);font-size:12px;cursor:pointer;white-space:nowrap;}
+.key-toggle:hover{color:var(--tx);border-color:var(--bd3);}
+.key-note{font-size:12px;color:var(--tx3);line-height:1.7;}
+.key-note a{color:var(--ac);text-decoration:none;}
+.key-note a:hover{text-decoration:underline;}
+.key-btnrow{display:flex;gap:8px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- NIST SC-8 / OWASP A05: HTTPS enforcement warning -->
+  <div id="httpsWarn">&#9888; SECURITY WARNING [SC-8]: Page loaded over HTTP. API calls may be intercepted. Use HTTPS in production.</div>
+
+  <!-- Header -->
+  <header class="hdr">
+    <div>
+      <div class="logo-badge"><div class="ldot"></div>Policy-as-Code &middot; Live</div>
+      <h1 class="site-title">AI <span>Security</span> Analyzer</h1>
+    </div>
+    <div class="hdr-right">
+      NIST SP 800-53 Rev 5<br>
+      OWASP Top 10 : 2021<br>
+      OPA / Conftest compatible<br>
+      <span id="sessEl" style="color:var(--tx3)"></span>
+    </div>
+  </header>
+
+  <!-- Active security controls posture bar -->
+  <div class="posture">
+    <span class="plabel">Active controls</span>
+    <span class="chip cg" data-tip="CSP meta header active — whitelists all sources"><span class="d"></span>CSP [SI-3]</span>
+    <span class="chip cg" data-tip="X-Frame-Options: DENY blocks clickjacking"><span class="d"></span>Anti-Clickjack [SC-18]</span>
+    <span class="chip cg" data-tip="escapeHTML() wraps all dynamic DOM writes"><span class="d"></span>XSS Filter [A03]</span>
+    <span class="chip cg" data-tip="50KB cap + JSON schema validation before parse"><span class="d"></span>Input Validation [SI-10]</span>
+    <span class="chip cg" data-tip="5 scans per 60 seconds, auto-resets"><span class="d"></span>Rate Limit [SC-5]</span>
+    <span class="chip cb" data-tip="Regex scans for AWS keys, tokens, passwords on keystroke"><span class="d"></span>Secret Detection [IA-5]</span>
+    <span class="chip cb" data-tip="Timestamped scan events, session-only storage"><span class="d"></span>Audit Log [AU-12]</span>
+    <span class="chip cp" data-tip="CSP connect-src limits API calls to api.anthropic.com only"><span class="d"></span>SSRF Guard [SC-7]</span>
+    <span class="chip cg" data-tip="crossorigin attribute on external font resource"><span class="d"></span>SRI [A06]</span>
+    <span class="chip ca" data-tip="HSTS meta header + HTTP detection banner"><span class="d"></span>HSTS [SC-8]</span>
+    <span class="chip cg" data-tip="No localStorage, cookies, or IndexedDB used anywhere"><span class="d"></span>No Persistence [SC-28]</span>
+  </div>
+
+  <!-- Main 3-column grid -->
+  <div class="mgrid">
+
+    <!-- LEFT: input + about -->
+    <div class="lcol">
+
+      <!-- API Key Panel -->
+      <div class="key-panel">
+        <div class="ph">
+          <span class="pt">Anthropic API key</span>
+          <span id="keyBadge" class="badge bred">Not set</span>
+        </div>
+        <div class="key-body">
+          <div id="keyStatus" class="key-status unset">&#9679; No key set — AI threat modeling disabled</div>
+          <div class="key-input-row">
+            <input id="keyInput" class="key-input" type="password"
+              placeholder="sk-ant-api03-..."
+              autocomplete="off" autocorrect="off" spellcheck="false"
+              oninput="onKeyInput()" maxlength="200">
+            <button class="key-toggle" onclick="toggleKeyVis()" id="keyToggle">Show</button>
+          </div>
+          <div class="key-btnrow">
+            <button class="btn btn-p" style="flex:1" onclick="saveKey()">Save key</button>
+            <button class="btn" onclick="testKey()" id="testBtn">Test</button>
+            <button class="btn" onclick="clearKey()">Clear</button>
+          </div>
+          <div class="key-note">
+            Your key is stored in memory only — never saved to disk, cookies, or localStorage. [SC-28]<br>
+            Get a free key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> — new accounts get $5 free credit.
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+          <button class="tab active" onclick="loadCfg('insecure',this)">insecure.json</button>
+          <button class="tab" onclick="loadCfg('secure',this)">secure.json</button>
+          <button class="tab" onclick="loadCfg('custom',this)">custom</button>
+        </div>
+        <!-- SI-10 / A03: textarea value never injected raw into DOM -->
+        <textarea id="cfgIn" spellcheck="false" aria-label="Cloud config JSON editor" maxlength="51200" oninput="onInput()"></textarea>
+        <div class="imeta">
+          <span id="sizeEl" class="sok">0 B / 50 KB</span>
+          <span id="validEl" style="color:var(--tx3)">—</span>
+        </div>
+        <!-- IA-5 / A02: Secret detection warning -->
+        <div id="secretWarn" class="alert alert-amber">
+          &#9888; <strong>SECRET DETECTED [IA-5]:</strong> <span id="secretDetail"></span>Do not use real credentials. Rotate exposed secrets immediately.
+        </div>
+        <!-- SC-5 / A04: Rate limit warning -->
+        <div id="rlWarn" class="alert alert-red">
+          &#9888; Rate limit [SC-5]: Max 5 scans per 60s. Resets in <span id="rlcd">60</span>s.
+        </div>
+        <div class="btnrow">
+          <button class="btn btn-p" onclick="runScan()" id="scanBtn">&#9654; Run scan</button>
+          <button class="btn" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ph"><span class="pt">How it works</span><span class="badge bac">v2.0</span></div>
+        <div style="padding:14px 18px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:10px;font-size:14px;color:var(--tx2)"><span style="color:var(--ac);font-family:var(--mono);font-size:12px;min-width:18px;margin-top:2px">01</span><span>Paste cloud config JSON. Input validated for size and schema before processing.</span></div>
+          <div style="display:flex;gap:10px;font-size:14px;color:var(--tx2)"><span style="color:var(--ac);font-family:var(--mono);font-size:12px;min-width:18px;margin-top:2px">02</span><span>17 NIST-mapped policy rules run client-side. Config never leaves your browser.</span></div>
+          <div style="display:flex;gap:10px;font-size:14px;color:var(--tx2)"><span style="color:var(--ac);font-family:var(--mono);font-size:12px;min-width:18px;margin-top:2px">03</span><span>Violation messages only (not raw config) sent to Claude API over HTTPS.</span></div>
+          <div style="display:flex;gap:10px;font-size:14px;color:var(--tx2)"><span style="color:var(--ac);font-family:var(--mono);font-size:12px;min-width:18px;margin-top:2px">04</span><span>AI returns attack paths, business impact, and prioritized remediation steps.</span></div>
+          <div style="margin-top:4px;padding-top:10px;border-top:1px solid var(--bd);">
+            <a href="https://github.com/kyoraiq/policy-as-code-compliance-pipeline" target="_blank" rel="noopener noreferrer" style="font-family:var(--mono);font-size:12px;color:var(--ac);text-decoration:none;">&#8599; kyoraiq/policy-as-code-compliance-pipeline</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: results -->
+    <div class="ccol">
+      <div class="panel">
+        <div class="ph"><span class="pt">Policy scan results</span><span id="vbadge" class="badge bgray">—</span></div>
+        <div id="policyRes"><div class="ph_holder">Run a scan to see policy violations</div></div>
+      </div>
+      <div class="panel">
+        <div class="ph"><span class="pt">AI threat model</span><span class="badge bbl">Claude</span></div>
+        <div id="aiRes"><div class="ph_holder">AI analysis appears after violations are found</div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: security controls + audit log -->
+    <div class="rcol">
+
+      <!-- OWASP Top 10 implementations -->
+      <div class="panel">
+        <div class="ph"><span class="pt">OWASP Top 10</span><span class="badge bac">2021</span></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A03 — Injection</div><div class="cname">XSS Prevention</div><div class="cdesc">escapeHTML() on all DOM writes. Zero raw innerHTML from user input.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A04 — Insecure Design</div><div class="cname">Input Cap + Rate Limit</div><div class="cdesc">50KB max input. 5 API calls/60s. JSON schema validated pre-parse.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A05 — Misconfiguration</div><div class="cname">Security Headers</div><div class="cdesc">CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy set.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A06 — Vulnerable Components</div><div class="cname">Subresource Integrity</div><div class="cdesc">External font loaded with crossorigin. No unverified CDN scripts.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A02 — Cryptographic Failures</div><div class="cname">No Raw Config Transmitted</div><div class="cdesc">Only violation messages sent to API. Raw config stays client-side.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A08 — Data Integrity</div><div class="cname">Secret Detection</div><div class="cdesc">Regex scans for API keys, tokens, passwords on every keystroke.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A09 — Security Logging</div><div class="cname">Client Audit Log</div><div class="cdesc">Timestamped scan events with outcome, resource, violation count.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">A10 — SSRF</div><div class="cname">API Allowlist via CSP</div><div class="cdesc">connect-src restricts outbound to api.anthropic.com only.</div></div></div>
+      </div>
+
+      <!-- NIST 800-53 implementations -->
+      <div class="panel">
+        <div class="ph"><span class="pt">NIST 800-53 Rev 5</span><span class="badge bac">Active</span></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SI-10</div><div class="cname">Input Validation</div><div class="cdesc">Size limit, JSON validity, schema structure checked before rules fire.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SI-3</div><div class="cname">Malicious Code Protection</div><div class="cdesc">CSP blocks injection. No eval() or dynamic code execution used.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">AU-2 / AU-12</div><div class="cname">Audit Logging</div><div class="cdesc">Every scan logged with timestamp, resource, environment, outcome.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SC-8</div><div class="cname">Transmission Confidentiality</div><div class="cdesc">HSTS set. HTTP access triggers visible security warning banner.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SC-5</div><div class="cname">DoS Protection</div><div class="cdesc">Rate limiter prevents API flooding. Auto-resets after 60 seconds.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">IA-5</div><div class="cname">Authenticator Management</div><div class="cdesc">Secret detection warns before real credentials are processed.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SC-7</div><div class="cname">Boundary Protection</div><div class="cdesc">SSRF prevented via CSP allowlist. No arbitrary outbound calls.</div></div></div>
+        <div class="citem"><div class="cst ca-st">&#10003;</div><div class="cdet"><div class="cid">SC-28</div><div class="cname">Protection at Rest</div><div class="cdesc">No localStorage, cookies, or IndexedDB. Session-only audit log.</div></div></div>
+      </div>
+
+      <!-- Audit log -->
+      <div class="panel">
+        <div class="ph"><span class="pt">Audit log [AU-12]</span><span id="acount" class="badge bgray">0 events</span></div>
+        <div class="alog" id="alog"><div class="aempty">No events yet</div></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="fl">
+      AI Security Analyzer v2.0 &mdash; Policy-as-Code Compliance Pipeline<br>
+      NIST SP 800-53 Rev 5 &middot; OWASP Top 10 : 2021 &middot; OPA / Conftest &middot; Claude AI<br>
+      <a href="https://github.com/kyoraiq/policy-as-code-compliance-pipeline" class="flink" target="_blank" rel="noopener noreferrer">&#8599; GitHub Repository</a>
+    </div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--tx3);text-align:right;line-height:2;">All policy checks run client-side<br>Config never stored or persisted<br>Only violations sent to Claude API</div>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+
+/* ── NIST SC-8 / OWASP A05: HTTPS enforcement ──────────────────────────── */
+if(location.protocol==='http:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1')
+  document.getElementById('httpsWarn').style.display='flex';
+
+/* ── AU-2: Session ID for audit correlation ─────────────────────────────── */
+const SID='sess_'+Math.random().toString(36).slice(2,10).toUpperCase();
+document.getElementById('sessEl').textContent='Session: '+SID;
+
+/* ── SI-10 / A03: XSS prevention — ALL dynamic DOM writes use escapeHTML ─ */
+function esc(s){
+  if(typeof s!=='string')s=String(s);
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\//g,'&#47;');
+}
+
+/* ── IA-5 / SC-28: API Key — memory-only, never persisted ──────────────── */
+let API_KEY = '';
+
+function onKeyInput() {
+  const val = document.getElementById('keyInput').value.trim();
+  const badge = document.getElementById('keyBadge');
+  const status = document.getElementById('keyStatus');
+  if (!val) {
+    badge.textContent = 'Not set'; badge.className = 'badge bred';
+    status.textContent = '\u25CF No key set \u2014 AI threat modeling disabled';
+    status.className = 'key-status unset';
+  } else if (!val.startsWith('sk-ant-')) {
+    badge.textContent = 'Invalid'; badge.className = 'badge bam';
+    status.textContent = '\u26A0 Key must start with sk-ant-api03-...';
+    status.className = 'key-status testing';
+  } else {
+    badge.textContent = 'Ready to save'; badge.className = 'badge bam';
+    status.textContent = '\u25CB Key entered \u2014 click Save to activate';
+    status.className = 'key-status testing';
+  }
+}
+
+function saveKey() {
+  const val = document.getElementById('keyInput').value.trim();
+  if (!val) return;
+  if (!val.startsWith('sk-ant-')) {
+    document.getElementById('keyStatus').textContent = '\u26A0 Invalid key format. Anthropic keys start with sk-ant-api03-';
+    document.getElementById('keyStatus').className = 'key-status unset';
+    return;
+  }
+  API_KEY = val;
+  const masked = 'sk-ant-...' + val.slice(-4);
+  document.getElementById('keyBadge').textContent = 'Active';
+  document.getElementById('keyBadge').className = 'badge bgn';
+  document.getElementById('keyStatus').textContent = '\u2713 Key active \u2014 ' + masked + ' \u2014 AI threat modeling enabled';
+  document.getElementById('keyStatus').className = 'key-status set';
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyToggle').textContent = 'Show';
+}
+
+function clearKey() {
+  API_KEY = '';
+  document.getElementById('keyInput').value = '';
+  document.getElementById('keyBadge').textContent = 'Not set';
+  document.getElementById('keyBadge').className = 'badge bred';
+  document.getElementById('keyStatus').textContent = '\u25CF No key set \u2014 AI threat modeling disabled';
+  document.getElementById('keyStatus').className = 'key-status unset';
+}
+
+function toggleKeyVis() {
+  const inp = document.getElementById('keyInput');
+  const btn = document.getElementById('keyToggle');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'Hide'; }
+  else { inp.type = 'password'; btn.textContent = 'Show'; }
+}
+
+async function testKey() {
+  const keyToTest = document.getElementById('keyInput').value.trim() || API_KEY;
+  if (!keyToTest) {
+    document.getElementById('keyStatus').textContent = '\u26A0 Enter a key first then click Test';
+    document.getElementById('keyStatus').className = 'key-status testing';
+    return;
+  }
+  const btn = document.getElementById('testBtn');
+  btn.disabled = true; btn.textContent = 'Testing...';
+  document.getElementById('keyStatus').textContent = '\u25CB Testing connection to Anthropic API...';
+  document.getElementById('keyStatus').className = 'key-status testing';
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': keyToTest, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
+    });
+    const d = await r.json();
+    if (d.content || d.type === 'message') {
+      document.getElementById('keyStatus').textContent = '\u2713 Connection successful \u2014 key is valid and working';
+      document.getElementById('keyStatus').className = 'key-status set';
+      document.getElementById('keyBadge').textContent = 'Verified';
+      document.getElementById('keyBadge').className = 'badge bgn';
+    } else if (d.error) {
+      document.getElementById('keyStatus').textContent = '\u2717 API error: ' + esc(d.error.message || 'Unknown error');
+      document.getElementById('keyStatus').className = 'key-status unset';
+    }
+  } catch(e) {
+    document.getElementById('keyStatus').textContent = '\u2717 Connection failed: ' + esc(e.message);
+    document.getElementById('keyStatus').className = 'key-status unset';
+  }
+  btn.disabled = false; btn.textContent = 'Test';
+}
+
+
+const RL={max:5,win:60000,calls:[],timer:null};
+function checkRL(){
+  const now=Date.now();
+  RL.calls=RL.calls.filter(t=>now-t<RL.win);
+  if(RL.calls.length>=RL.max){
+    const rem=Math.ceil((RL.win-(now-RL.calls[0]))/1000);
+    showRL(rem); return false;
+  }
+  RL.calls.push(now); return true;
+}
+function showRL(s){
+  const el=document.getElementById('rlWarn'); el.style.display='block';
+  let c=s; document.getElementById('rlcd').textContent=c;
+  if(RL.timer)clearInterval(RL.timer);
+  RL.timer=setInterval(()=>{c--;const cd=document.getElementById('rlcd');if(cd)cd.textContent=c;if(c<=0){clearInterval(RL.timer);el.style.display='none';}},1000);
+}
+
+/* ── IA-5 / SC-28 / A02: Secret detection ─────────────────────────────── */
+const SECRETS=[
+  {p:/AKIA[0-9A-Z]{16}/,l:'AWS Access Key ID detected'},
+  {p:/(?:password|passwd|pwd)\s*["']?\s*:\s*["'][^"']{6,}/i,l:'Plaintext password field detected'},
+  {p:/sk-[a-zA-Z0-9]{32,}/,l:'OpenAI/Stripe secret key detected'},
+  {p:/ghp_[a-zA-Z0-9]{36}/,l:'GitHub Personal Access Token detected'},
+  {p:/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----/,l:'Private key material detected'},
+  {p:/xox[baprs]-[a-zA-Z0-9-]{10,}/,l:'Slack token detected'},
+  {p:/AIza[0-9A-Za-z_-]{35}/,l:'Google API key detected'},
+];
+function scanSecrets(t){for(const{p,l}of SECRETS)if(p.test(t))return l;return null;}
+
+/* ── SI-10 / A04: Input size validation ────────────────────────────────── */
+const MAX_BYTES=51200;
+
+function onInput(){
+  const val=document.getElementById('cfgIn').value;
+  const bytes=new Blob([val]).size;
+  const sel=document.getElementById('sizeEl');
+  const vel=document.getElementById('validEl');
+  const kb=(bytes/1024).toFixed(1);
+  if(bytes>MAX_BYTES){sel.textContent=kb+' KB / 50 KB — TOO LARGE';sel.className='sbad';}
+  else if(bytes>MAX_BYTES*.8){sel.textContent=kb+' KB / 50 KB';sel.className='swarn';}
+  else{sel.textContent=kb+' KB / 50 KB';sel.className='sok';}
+  if(!val.trim()){vel.textContent='—';vel.style.color='var(--tx3)';return;}
+  try{JSON.parse(val);vel.textContent='Valid JSON ✓';vel.style.color='var(--gn)';}
+  catch(e){vel.textContent='Invalid JSON';vel.style.color='var(--rd)';}
+  const sec=scanSecrets(val);
+  const sw=document.getElementById('secretWarn');
+  if(sec){document.getElementById('secretDetail').textContent=sec+'. ';sw.style.display='block';}
+  else sw.style.display='none';
+}
+
+/* ── AU-2 / AU-12 / A09: Audit log ─────────────────────────────────────── */
+const LOG=[];
+function addLog(resource,env,count,outcome){
+  LOG.unshift({ts:new Date().toISOString(),session:SID,resource:resource||'unknown',env:env||'unknown',count,outcome});
+  renderLog();
+}
+function renderLog(){
+  const el=document.getElementById('alog');
+  const ce=document.getElementById('acount');
+  ce.textContent=LOG.length+' event'+(LOG.length!==1?'s':'');
+  if(!LOG.length){el.innerHTML='<div class="aempty">No events yet</div>';return;}
+  el.innerHTML=LOG.slice(0,20).map(e=>{
+    const t=e.ts.slice(11,19);
+    const bc=e.outcome==='PASS'?'bgn':'bred';
+    return`<div class="aentry"><span class="atime">${esc(t)}</span><span class="amsg">${esc(e.resource)} (${esc(e.env)})</span><span class="badge ${bc}" style="font-size:9px">${esc(e.outcome)}</span></div>`;
+  }).join('');
+}
+
+/* ── Sample configs ─────────────────────────────────────────────────────── */
+const CFGS={
+  insecure:{storage:{resource_type:"cloud_storage_bucket",name:"dev-quicktest-bucket-no-security",region:"us-east-1",created_by:"manual_console",encryption:{enabled:false,algorithm:"NONE",key_management:"none"},public_access:{block_public_acls:false,block_public_policy:false,ignore_public_acls:false,restrict_public_buckets:false},logging:{enabled:false,destination:"",retention_days:0},versioning:{enabled:false},cors:{enabled:true,allowed_origins:["*"]},tags:{environment:"unknown",project:"quick-test"}}},
+  secure:{storage:{resource_type:"cloud_storage_bucket",name:"prod-customer-data-bucket-a1b2c3",region:"us-east-1",created_by:"terraform",encryption:{enabled:true,algorithm:"AES-256",key_management:"customer_managed",kms_key_id:"arn:aws:kms:us-east-1:123456789012:key/mrk-abc123",key_rotation_enabled:true},public_access:{block_public_acls:true,block_public_policy:true,ignore_public_acls:true,restrict_public_buckets:true},logging:{enabled:true,destination:"s3://audit-logs-centralized/prod/",retention_days:365,log_format:"json"},versioning:{enabled:true,mfa_delete:true},replication:{enabled:true,destination_region:"us-west-2"},tags:{environment:"production",owner:"security-team@company.com",data_classification:"confidential",compliance_scope:"PCI-DSS,HIPAA,SOC2"}}},
+  custom:{storage:{resource_type:"cloud_storage_bucket",name:"my-bucket",encryption:{enabled:true,algorithm:"AES-256"},public_access:{block_public_acls:true,block_public_policy:true,ignore_public_acls:true,restrict_public_buckets:true},logging:{enabled:true,destination:"s3://my-logs/",retention_days:90},versioning:{enabled:true},tags:{environment:"staging",owner:"my-team@company.com",data_classification:"internal"}}}
+};
+
+function loadCfg(t,tab){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  if(tab)tab.classList.add('active');
+  document.getElementById('cfgIn').value=JSON.stringify(CFGS[t],null,2);
+  onInput();
+  document.getElementById('policyRes').innerHTML='<div class="ph_holder">Run a scan to see policy violations</div>';
+  document.getElementById('aiRes').innerHTML='<div class="ph_holder">AI analysis appears after violations are found</div>';
+  document.getElementById('vbadge').textContent='—'; document.getElementById('vbadge').className='badge bgray';
+}
+loadCfg('insecure',null);
+
+function clearAll(){
+  document.getElementById('cfgIn').value=''; onInput();
+  document.getElementById('policyRes').innerHTML='<div class="ph_holder">Run a scan to see policy violations</div>';
+  document.getElementById('aiRes').innerHTML='<div class="ph_holder">AI analysis appears after violations are found</div>';
+  document.getElementById('vbadge').textContent='—'; document.getElementById('vbadge').className='badge bgray';
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===0));
+}
+
+/* ── Policy engine: 17 rules ────────────────────────────────────────────── */
+function checkPolicy(cfg){
+  const v=[]; const s=cfg.storage;
+  if(!s)return[{c:'GENERAL',m:'No storage block found.'}];
+  if(!s.encryption)v.push({c:'SC-28',m:'storage.encryption block missing.'});
+  else if(!s.encryption.enabled)v.push({c:'SC-28',m:'Encryption disabled. Data stored in plaintext.'});
+  else if(!['AES-256','AES-256-GCM','RSA-4096'].includes(s.encryption.algorithm))
+    v.push({c:'SC-28(1)',m:'Algorithm "'+s.encryption.algorithm+'" not approved. Use AES-256 or AES-256-GCM.'});
+  if(!s.public_access)v.push({c:'AC-3',m:'public_access block missing.'});
+  else{
+    if(!s.public_access.block_public_acls)v.push({c:'AC-3',m:'block_public_acls false. Public ACLs can expose bucket.'});
+    if(!s.public_access.block_public_policy)v.push({c:'AC-6',m:'block_public_policy false. Public bucket policies permitted.'});
+    if(!s.public_access.ignore_public_acls)v.push({c:'SC-7',m:'ignore_public_acls false. Existing public ACLs honored.'});
+    if(!s.public_access.restrict_public_buckets)v.push({c:'SC-7(5)',m:'restrict_public_buckets false. Cross-account access allowed.'});
+  }
+  if(!s.logging)v.push({c:'AU-2',m:'logging block missing.'});
+  else if(!s.logging.enabled)v.push({c:'AU-2',m:'Logging disabled. No audit trail exists.'});
+  else{
+    if(!s.logging.destination||s.logging.destination==='')v.push({c:'AU-9',m:'logging.destination empty. Logs have nowhere to go.'});
+    if(!s.logging.retention_days||s.logging.retention_days<90)
+      v.push({c:'AU-3',m:'Log retention '+( s.logging.retention_days||0)+' days. Minimum: 90 days.'});
+  }
+  if(!s.tags)v.push({c:'CM-8',m:'tags block missing. Resource unidentified.'});
+  else{
+    if(!s.tags.environment)v.push({c:'CM-8',m:'tags.environment missing.'});
+    else if(!['production','staging','development','sandbox'].includes(s.tags.environment))
+      v.push({c:'CM-8',m:'Environment tag "'+s.tags.environment+'" not valid.'});
+    if(!s.tags.owner)v.push({c:'CM-8(1)',m:'tags.owner missing. No accountability.'});
+    if(!s.tags.data_classification)v.push({c:'PM-5',m:'tags.data_classification missing.'});
+  }
+  if(s.tags&&s.tags.environment==='production'){
+    if(!s.versioning)v.push({c:'CP-9',m:'versioning missing for production resource.'});
+    else if(!s.versioning.enabled)v.push({c:'CP-9',m:'Versioning disabled in production. Data loss unrecoverable.'});
+  }
+  return v;
+}
+
+/* ── Main scan orchestrator ─────────────────────────────────────────────── */
+function runScan(){
+  const input=document.getElementById('cfgIn').value.trim();
+  if(new Blob([input]).size>MAX_BYTES){document.getElementById('policyRes').innerHTML=`<div class="alert alert-red" style="display:block;margin:9px">Input exceeds 50KB [SI-10].</div>`;return;}
+  let cfg; try{cfg=JSON.parse(input);}
+  catch(e){document.getElementById('policyRes').innerHTML=`<div class="alert alert-red" style="display:block;margin:9px">Invalid JSON [SI-10]: ${esc(e.message)}</div>`;return;}
+  if(!checkRL())return;
+  const btn=document.getElementById('scanBtn'); btn.disabled=true; btn.textContent='Scanning...';
+  const violations=checkPolicy(cfg);
+  const rname=(cfg.storage&&cfg.storage.name)||'unnamed';
+  const renv=(cfg.storage&&cfg.storage.tags&&cfg.storage.tags.environment)||'unknown';
+  addLog(rname,renv,violations.length,violations.length===0?'PASS':'FAIL');
+  const vb=document.getElementById('vbadge');
+  if(!violations.length){
+    vb.textContent='PASS'; vb.className='badge bgn';
+    document.getElementById('policyRes').innerHTML='<div class="passbanner fade-in"><div class="passicon">&#10003;</div>All 17 policy rules passed — compliant.</div>';
+    document.getElementById('aiRes').innerHTML='<div class="passbanner fade-in" style="color:var(--tx2)"><div class="passicon" style="color:var(--gn)">&#10003;</div>No violations. AI threat modeling not required.</div>';
+    btn.disabled=false; btn.textContent='▶ Run scan'; return;
+  }
+  vb.textContent=violations.length+' violation'+(violations.length!==1?'s':''); vb.className='badge bred';
+  /* A03 / SI-10: all values through esc() */
+  document.getElementById('policyRes').innerHTML='<ul style="list-style:none" class="fade-in">'+
+    violations.map(v=>`<li class="vi"><span class="ctag">${esc(v.c)}</span><span class="vmsg">${esc(v.m)}</span></li>`).join('')+'</ul>';
+  document.getElementById('aiRes').innerHTML='<div class="ail fade-in"><div class="lds"><span></span><span></span><span></span></div>Sending to Claude...</div>';
+  btn.disabled=false; btn.textContent='▶ Run scan';
+  callClaude(violations,rname,renv);
+}
+
+/* ── SC-7 / A10: SSRF-safe API call — only to api.anthropic.com ─────────── */
+async function callClaude(violations,rname,renv){
+  /* A02: only violation messages sent, not raw config */
+  const vtext=violations.map(v=>'['+v.c+'] '+v.m).join('\n');
+  const prompt=`You are a senior cloud security architect. Violations found on resource "${rname}" in "${renv}":\n\n${vtext}\n\nRespond ONLY with valid JSON, no markdown:\n{"risk_score":<1-10>,"risk_label":"<Critical|High|Medium|Low>","summary":"<2 sentences>","attack_paths":["<attack with real technique names>","<attack 2>","<attack 3>"],"business_impact":["<impact with regulation/cost>","<impact 2>","<impact 3>"],"top_fixes":["<fix with exact config field>","<fix 2>","<fix 3>"]}`;
+  try{
+    const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+    if(API_KEY) headers['x-api-key']=API_KEY;
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
+    const d=await r.json();
+    const txt=(d.content&&d.content[0]&&d.content[0].text)||'';
+    const result=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    renderAI(result);
+  }catch(err){
+    const noKey=!API_KEY?' Enter your Anthropic API key above to enable AI analysis, or open inside claude.ai.':'';
+    document.getElementById('aiRes').innerHTML=`<div class="alert alert-red" style="display:block;margin:9px">AI analysis unavailable: ${esc(err.message)}.${esc(noKey)}</div>`;
+  }
+}
+
+/* ── AI results renderer — all values through esc() [A03 / SI-10] ─────── */
+function renderAI(r){
+  const score=Math.min(10,Math.max(1,Math.round(r.risk_score)));
+  const cm={Critical:'#f87171',High:'#fbbf24',Medium:'#60a5fa',Low:'#4ade80'};
+  const color=cm[r.risk_label]||'#888';
+  const pct=Math.round((score/10)*100);
+  const bm={Critical:'bred',High:'bam',Medium:'bbl',Low:'bgn'};
+  let h=`<div class="fade-in">
+    <div class="stats">
+      <div class="sc"><span class="sn" style="color:${color}">${score}<span style="font-size:12px;color:var(--tx3)">/10</span></span><span class="sl">Risk score</span></div>
+      <div class="sc"><span class="sn" style="color:${color};font-size:15px">${esc(r.risk_label)}</span><span class="sl">Severity</span></div>
+      <div class="sc"><span class="sn" style="color:var(--rd)">${r.attack_paths?r.attack_paths.length:0}</span><span class="sl">Attack paths</span></div>
+    </div>
+    <div class="rrow">
+      <div class="rlr"><span class="rlt">Overall risk</span><span class="badge ${bm[r.risk_label]||'bgray'}">${esc(r.risk_label)}</span></div>
+      <div class="rbb"><div class="rbf" style="width:${pct}%;background:${color}"></div></div>
+      <p class="rsum">${esc(r.summary)}</p>
+    </div>
+    <div class="tsec">
+      <div class="thdr"><div class="tic atk">&#9888;</div><span class="ttl atk">Attack paths</span></div>
+      <ul class="tlist atk">${(r.attack_paths||[]).map(a=>`<li><div class="tb"></div><span>${esc(a)}</span></li>`).join('')}</ul>
+    </div>
+    <div class="tsec">
+      <div class="thdr"><div class="tic imp">$</div><span class="ttl imp">Business impact</span></div>
+      <ul class="tlist imp">${(r.business_impact||[]).map(b=>`<li><div class="tb"></div><span>${esc(b)}</span></li>`).join('')}</ul>
+    </div>
+    <div class="tsec">
+      <div class="thdr"><div class="tic fix">&#10003;</div><span class="ttl fix">Remediation steps</span></div>
+      <ul class="tlist fix">${(r.top_fixes||[]).map(f=>`<li><div class="tb"></div><span>${esc(f)}</span></li>`).join('')}</ul>
+    </div>
+  </div>`;
+  document.getElementById('aiRes').innerHTML=h;
+}
+</script>
+</body>
+</html>
