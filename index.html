@@ -662,8 +662,21 @@ async function callClaude(violations,rname,renv){
     if(API_KEY) headers['x-api-key']=API_KEY;
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     const d=await r.json();
+    if(d.error){
+      throw new Error(d.error.message||'API error: '+d.error.type);
+    }
     const txt=(d.content&&d.content[0]&&d.content[0].text)||'';
-    const result=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    if(!txt){throw new Error('Empty response from Claude. Check your API key has available credits.');}
+    let result;
+    try{
+      const clean=txt.replace(/```json|```/g,'').trim();
+      result=JSON.parse(clean);
+    }catch(parseErr){
+      // Claude returned text but not valid JSON — try to extract JSON block
+      const match=txt.match(/\{[\s\S]*\}/);
+      if(match){result=JSON.parse(match[0]);}
+      else{throw new Error('Claude response was not valid JSON. Try scanning again.');}
+    }
     renderAI(result);
   }catch(err){
     const noKey=!API_KEY?' Enter your Anthropic API key above to enable AI analysis, or open inside claude.ai.':'';
