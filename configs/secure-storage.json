@@ -1,0 +1,88 @@
+{
+  "_comment": "=================================================================",
+  "_comment_2": "FILE: configs/secure-storage.json",
+  "_comment_3": "PURPOSE: A fully compliant cloud storage configuration.",
+  "_comment_4": "RESULT: Passes ALL OPA policy checks.",
+  "_comment_5": "USE CASE: This represents how a production storage bucket should",
+  "_comment_6": "be configured before deployment in a regulated environment.",
+  "_comment_7": "=================================================================",
+
+  "storage": {
+
+    "resource_type": "cloud_storage_bucket",
+    "name": "prod-customer-data-bucket-a1b2c3",
+    "region": "us-east-1",
+    "created_by": "terraform",
+    "schema_version": "1.0.0",
+
+    "encryption": {
+      "_comment": "NIST SC-28 — Encryption at rest using AES-256 with customer-managed key",
+      "enabled": true,
+      "algorithm": "AES-256",
+      "key_management": "customer_managed",
+      "kms_key_id": "arn:aws:kms:us-east-1:123456789012:key/mrk-abc123def456",
+      "key_rotation_enabled": true,
+      "key_rotation_period_days": 365
+    },
+
+    "public_access": {
+      "_comment": "NIST AC-3, SC-7 — All four public access block settings must be true",
+      "block_public_acls": true,
+      "block_public_policy": true,
+      "ignore_public_acls": true,
+      "restrict_public_buckets": true
+    },
+
+    "logging": {
+      "_comment": "NIST AU-2, AU-12 — Access logging with 365-day retention for forensics",
+      "enabled": true,
+      "destination": "s3://audit-logs-bucket-centralized/prod-customer-data/",
+      "retention_days": 365,
+      "log_format": "json",
+      "include_access_events": true,
+      "include_management_events": true,
+      "siem_export_enabled": true,
+      "siem_destination": "splunk-http-event-collector"
+    },
+
+    "versioning": {
+      "_comment": "NIST CP-9 — Versioning enabled for ransomware protection and recovery",
+      "enabled": true,
+      "mfa_delete": true
+    },
+
+    "replication": {
+      "enabled": true,
+      "destination_region": "us-west-2",
+      "destination_bucket": "prod-customer-data-bucket-dr-a1b2c3"
+    },
+
+    "lifecycle_policy": {
+      "enabled": true,
+      "transition_to_glacier_after_days": 90,
+      "expire_objects_after_days": 2555
+    },
+
+    "cors": {
+      "enabled": false
+    },
+
+    "object_lock": {
+      "enabled": true,
+      "mode": "GOVERNANCE",
+      "retention_days": 365
+    },
+
+    "tags": {
+      "_comment": "NIST CM-8 — Complete tagging for asset inventory and governance",
+      "environment": "production",
+      "owner": "platform-security-team@company.com",
+      "data_classification": "confidential",
+      "project": "customer-data-platform",
+      "cost_center": "CC-1042",
+      "compliance_scope": "PCI-DSS,HIPAA,SOC2",
+      "last_reviewed": "2024-10-01",
+      "terraform_managed": "true"
+    }
+  }
+}

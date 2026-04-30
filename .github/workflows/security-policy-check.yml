@@ -1,0 +1,229 @@
+# ==============================================================================
+# FILE: .github/workflows/security-policy-check.yml
+# PURPOSE: CI/CD pipeline that enforces cloud security policies using Conftest
+#          (Open Policy Agent). Runs on every push and pull request.
+# ==============================================================================
+
+name: Policy-as-Code Security Check
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TRIGGERS: Run this pipeline on every push to any branch, and on every
+# pull request targeting the main branch. This ensures no misconfigured
+# infrastructure can be merged without passing policy checks.
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # ============================================================================
+  # JOB: policy-compliance-check
+  # DESCRIPTION: Downloads Conftest (the OPA-based policy runner), then runs
+  # your Rego policies against every JSON config file in configs/. The job
+  # fails (exit code ≠ 0) if any policy is violated, blocking the merge.
+  # ============================================================================
+  policy-compliance-check:
+    name: "OPA Policy Enforcement"
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Step 1: Check out repository code ──────────────────────────────────
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Print environment context for traceability ──────────────────
+      - name: Print Job Context
+        run: |
+          echo "=============================================="
+          echo "  Policy-as-Code Compliance Pipeline"
+          echo "=============================================="
+          echo "  Repository : ${{ github.repository }}"
+          echo "  Branch     : ${{ github.ref_name }}"
+          echo "  Commit SHA : ${{ github.sha }}"
+          echo "  Triggered  : ${{ github.event_name }}"
+          echo "  Runner OS  : ${{ runner.os }}"
+          echo "  Timestamp  : $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          echo "=============================================="
+
+      # ── Step 3: Install Conftest ────────────────────────────────────────────
+      # Conftest is the CLI tool that loads .rego policy files and evaluates
+      # them against structured data (JSON, YAML, TOML, etc.).
+      # We pin to a specific version for reproducible builds.
+      - name: Install Conftest
+        run: |
+          echo ""
+          echo ">>> Installing Conftest (OPA policy runner)..."
+          CONFTEST_VERSION="0.51.0"
+          wget -q \
+            "https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}/conftest_${CONFTEST_VERSION}_Linux_x86_64.tar.gz" \
+            -O conftest.tar.gz
+
+          tar xzf conftest.tar.gz conftest
+          sudo mv conftest /usr/local/bin/conftest
+          echo ""
+          echo ">>> Conftest installed successfully:"
+          conftest --version
+
+      # ── Step 4: Validate policy files exist ────────────────────────────────
+      - name: Validate Policy and Config Files Exist
+        run: |
+          echo ""
+          echo ">>> Checking required files are present..."
+          echo ""
+
+          required_files=(
+            "policies/cloud-security-policy.rego"
+            "configs/secure-storage.json"
+            "configs/insecure-storage.json"
+          )
+
+          all_found=true
+          for f in "${required_files[@]}"; do
+            if [ -f "$f" ]; then
+              echo "  [FOUND]   $f"
+            else
+              echo "  [MISSING] $f  <-- REQUIRED"
+              all_found=false
+            fi
+          done
+
+          echo ""
+          if [ "$all_found" = false ]; then
+            echo "ERROR: One or more required files are missing. Aborting."
+            exit 1
+          else
+            echo "All required files are present."
+          fi
+
+      # ── Step 5: Run policy check on SECURE config (expected: PASS) ──────────
+      # This step should always pass. If it fails, there is a bug in the policy
+      # or the secure config has been accidentally broken.
+      - name: "Policy Check: secure-storage.json (Expected: PASS)"
+        id: check_secure
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "  CHECKING: configs/secure-storage.json"
+          echo "  EXPECTED: ALL POLICIES PASS"
+          echo "=============================================="
+          echo ""
+
+          conftest test configs/secure-storage.json \
+            --policy policies/ \
+            --output table \
+            --all-namespaces
+
+          EXIT_CODE=$?
+          echo ""
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "  ✅  RESULT: PASS — secure-storage.json satisfies all policies."
+          else
+            echo "  ❌  RESULT: FAIL — secure-storage.json violated one or more policies."
+            echo "  This is unexpected. Review the policy or the secure config file."
+            exit $EXIT_CODE
+          fi
+
+      # ── Step 6: Run policy check on INSECURE config (expected: FAIL) ────────
+      # We intentionally run Conftest on the insecure config and EXPECT it to
+      # fail. We capture the exit code and report the violations clearly.
+      # The pipeline step itself uses `|| true` so GitHub doesn't short-circuit,
+      # letting us print a formatted report before we decide to fail.
+      - name: "Policy Check: insecure-storage.json (Expected: FAIL)"
+        id: check_insecure
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "  CHECKING: configs/insecure-storage.json"
+          echo "  EXPECTED: POLICY VIOLATIONS DETECTED"
+          echo "=============================================="
+          echo ""
+
+          # Run conftest and capture exit code without aborting the step
+          conftest test configs/insecure-storage.json \
+            --policy policies/ \
+            --output table \
+            --all-namespaces || INSECURE_EXIT=$?
+
+          INSECURE_EXIT=${INSECURE_EXIT:-0}
+          echo ""
+          echo "----------------------------------------------"
+          if [ $INSECURE_EXIT -ne 0 ]; then
+            echo "  ✅  RESULT: VIOLATIONS DETECTED AS EXPECTED."
+            echo "  The insecure config correctly triggers policy failures."
+            echo "  In a real pipeline, this config would BLOCK the deployment."
+          else
+            echo "  ⚠️   WARNING: insecure-storage.json passed all policies."
+            echo "  The policies may not be working correctly."
+          fi
+          echo "----------------------------------------------"
+          echo ""
+          # Store for summary step
+          echo "insecure_exit_code=$INSECURE_EXIT" >> $GITHUB_OUTPUT
+
+      # ── Step 7: Run policy check on ALL configs in one pass ────────────────
+      # This is the enforcement step. It runs Conftest against all configs.
+      # Any violations from the insecure config will cause the pipeline to fail.
+      # In a real-world scenario, you would only have valid configs in your
+      # repo — this demo intentionally includes the insecure one to show the
+      # blocking behavior.
+      - name: "Full Policy Enforcement: All Config Files"
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "  FULL POLICY ENFORCEMENT SCAN"
+          echo "  Target: configs/*.json"
+          echo "  Policy: policies/*.rego"
+          echo "=============================================="
+          echo ""
+
+          echo "The following violations were found (pipeline will FAIL):"
+          echo ""
+
+          # Run against all JSON files in configs/
+          conftest test configs/*.json \
+            --policy policies/ \
+            --output table \
+            --all-namespaces
+
+          EXIT_CODE=$?
+          echo ""
+          if [ $EXIT_CODE -eq 0 ]; then
+            echo "  ✅  ALL CONFIGS PASSED — No policy violations found."
+          else
+            echo "  ❌  POLICY VIOLATIONS FOUND — Pipeline FAILED."
+            echo ""
+            echo "  ACTION REQUIRED:"
+            echo "  Review the violations listed above and remediate the"
+            echo "  misconfigured resources before merging this change."
+            echo ""
+            echo "  See README.md for remediation guidance and NIST 800-53 mappings."
+            exit $EXIT_CODE
+          fi
+
+      # ── Step 8: Print compliance summary ───────────────────────────────────
+      - name: Print Compliance Summary
+        if: always()
+        run: |
+          echo ""
+          echo "=============================================="
+          echo "  COMPLIANCE PIPELINE SUMMARY"
+          echo "=============================================="
+          echo ""
+          echo "  Policies Evaluated:"
+          echo "    • Encryption at rest must be enabled"
+          echo "    • Public access must be disabled"
+          echo "    • Audit logging must be enabled"
+          echo "    • Environment tag must be present"
+          echo ""
+          echo "  Policy Framework : Open Policy Agent (OPA / Conftest)"
+          echo "  Policy Language  : Rego"
+          echo "  Compliance Refs  : NIST SP 800-53 Rev 5"
+          echo "                     CIS Benchmarks"
+          echo "                     ISO 27001"
+          echo ""
+          echo "  For full control mappings, see README.md"
+          echo "=============================================="

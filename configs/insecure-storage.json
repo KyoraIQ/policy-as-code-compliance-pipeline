@@ -1,0 +1,64 @@
+{
+  "_comment": "=================================================================",
+  "_comment_2": "FILE: configs/insecure-storage.json",
+  "_comment_3": "PURPOSE: A deliberately misconfigured storage resource.",
+  "_comment_4": "RESULT: FAILS multiple OPA policy checks.",
+  "_comment_5": "USE CASE: Demonstrates what a real-world misconfiguration looks",
+  "_comment_6": "like and how the pipeline catches it BEFORE deployment.",
+  "_comment_7": "INTENTIONAL VIOLATIONS: See inline comments for details.",
+  "_comment_8": "=================================================================",
+
+  "storage": {
+
+    "resource_type": "cloud_storage_bucket",
+    "name": "dev-quicktest-bucket-no-security",
+    "region": "us-east-1",
+    "created_by": "manual_console",
+    "schema_version": "1.0.0",
+
+    "encryption": {
+      "_violation": "VIOLATION 1 — SC-28: Encryption is explicitly disabled. Stored data is in plaintext.",
+      "enabled": false,
+      "algorithm": "NONE",
+      "key_management": "none"
+    },
+
+    "public_access": {
+      "_violation": "VIOLATION 2 — AC-3, SC-7: All four public access controls are turned off.",
+      "_violation_2": "This bucket is fully accessible from the public internet.",
+      "block_public_acls": false,
+      "block_public_policy": false,
+      "ignore_public_acls": false,
+      "restrict_public_buckets": false
+    },
+
+    "logging": {
+      "_violation": "VIOLATION 3 — AU-2: Logging is disabled. No audit trail exists for this bucket.",
+      "_violation_2": "There is no record of who accessed or modified any object.",
+      "enabled": false,
+      "destination": "",
+      "retention_days": 0
+    },
+
+    "versioning": {
+      "_violation": "VIOLATION 4 — CP-9: Versioning is disabled on what appears to be a production resource.",
+      "_violation_2": "Deleted or overwritten objects are not recoverable.",
+      "enabled": false
+    },
+
+    "cors": {
+      "_violation": "ADDITIONAL RISK: CORS is enabled with a wildcard origin (not checked by current policy)",
+      "enabled": true,
+      "allowed_origins": ["*"],
+      "allowed_methods": ["GET", "PUT", "POST", "DELETE"]
+    },
+
+    "tags": {
+      "_violation": "VIOLATION 5 — CM-8: environment tag has an invalid value ('unknown' is not allowed).",
+      "_violation_2": "VIOLATION 6 — CM-8(1): owner tag is missing entirely.",
+      "_violation_3": "VIOLATION 7 — PM-5: data_classification is missing entirely.",
+      "environment": "unknown",
+      "project": "quick-test"
+    }
+  }
+}
