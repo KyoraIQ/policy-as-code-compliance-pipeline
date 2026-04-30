@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Security Analyzer — Policy-as-Code</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #00d4aa;
+    --accent-dim: rgba(0,212,170,0.12);
+    --accent-dim2: rgba(0,212,170,0.06);
+    --red: #ff4d4d;
+    --red-dim: rgba(255,77,77,0.1);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.1);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.1);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.1);
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Background grid texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,170,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,170,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  .site-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-group { display: flex; flex-direction: column; gap: 6px; }
+
+  .logo-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .logo-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2s infinite;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  .site-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .site-title span { color: var(--accent); }
+
+  .header-meta {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(0,212,170,0.3);
+    background: var(--accent-dim2);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    margin-bottom: 6px;
+  }
+
+  /* Two-column layout */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Panel */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .panel-body { padding: 16px; }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .tab {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+  }
+
+  .tab:hover { color: var(--text); border-color: var(--border2); }
+  .tab.active { background: var(--accent-dim); border-color: rgba(0,212,170,0.3); color: var(--accent); }
+
+  /* Textarea */
+  textarea {
+    width: 100%;
+    height: 260px;
+    padding: 14px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    resize: none;
+    outline: none;
+  }
+
+  textarea::selection { background: rgba(0,212,170,0.2); }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border2);
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: transparent;
+  }
+
+  .btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.04); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .btn-primary:hover { background: #00f0c0; border-color: #00f0c0; color: #000; }
+  .btn-primary:disabled { background: var(--muted); border-color: var(--muted); color: #000; }
+
+  .scan-icon { font-size: 12px; }
+
+  /* Policy results panel */
+  .results-panel { margin-bottom: 20px; }
+
+  .violation-list { list-style: none; }
+
+  .violation-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+
+  .violation-item:last-child { border-bottom: none; }
+  .violation-item:hover { background: rgba(255,77,77,0.04); }
+
+  .control-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid rgba(255,77,77,0.2);
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+
+  .violation-msg {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .pass-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  .pass-icon {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--green-dim);
+    border: 1px solid rgba(52,211,153,0.3);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .error-banner {
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-radius: var(--radius);
+    margin: 12px;
+  }
+
+  /* AI analysis panel */
+  .ai-panel { }
+
+  .ai-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .loading-dots { display: flex; gap: 4px; }
+  .loading-dots span {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: bounce 1.2s infinite;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,80%,100% { transform:translateY(0); opacity:0.3; } 40% { transform:translateY(-4px); opacity:1; } }
+
+  /* Risk meter */
+  .risk-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .risk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .risk-label-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .risk-badge {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 12px;
+    border-radius: 20px;
+  }
+
+  .risk-bar-bg {
+    width: 100%;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .risk-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  .risk-summary {
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* Threat sections */
+  .threat-section {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .threat-section:last-child { border-bottom: none; }
+
+  .threat-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .threat-icon {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .threat-icon.attack { background: var(--red-dim); color: var(--red); }
+  .threat-icon.impact { background: var(--amber-dim); color: var(--amber); }
+  .threat-icon.fix { background: var(--green-dim); color: var(--green); }
+
+  .threat-heading-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .threat-heading-text.attack { color: var(--red); }
+  .threat-heading-text.impact { color: var(--amber); }
+  .threat-heading-text.fix { color: var(--green); }
+
+  .threat-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+
+  .threat-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  .threat-bullet {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    margin-top: 7px;
+    flex-shrink: 0;
+  }
+
+  .attack .threat-bullet { background: var(--red); }
+  .impact .threat-bullet { background: var(--amber); }
+  .fix .threat-bullet { background: var(--green); }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-cell {
+    background: var(--surface);
+    padding: 12px 16px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    font-family: var(--mono);
+    display: block;
+  }
+
+  .stat-lbl {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Footer */
+  .footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-left {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.8;
+  }
+
+  .footer-link {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .footer-link:hover { text-decoration: underline; }
+
+  .nist-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+  .nist-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--accent-dim2);
+    border: 1px solid rgba(0,212,170,0.15);
+    color: var(--accent);
+  }
+
+  /* Placeholder */
+  .placeholder {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 2;
+    border: 1px dashed var(--border2);
+    border-radius: var(--radius);
+    margin: 12px;
+  }
+
+  .placeholder-icon { font-size: 24px; margin-bottom: 8px; display: block; opacity: 0.4; }
+
+  /* Violation count badge */
+  .count-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid rgba(255,77,77,0.25);
+  }
+
+  .success-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(52,211,153,0.25);
+  }
+
+  .ai-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    background: var(--blue-dim);
+    color: var(--blue);
+    border: 1px solid rgba(96,165,250,0.25);
+  }
+
+  .panel-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--muted);
+  }
+
+  /* Animate in */
+  .fade-in { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Scrollbar */
+  textarea::-webkit-scrollbar { width: 4px; }
+  textarea::-webkit-scrollbar-track { background: transparent; }
+  textarea::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="logo-group">
+      <div class="logo-badge">
+        <div class="logo-dot"></div>
+        Policy-as-Code · Live
+      </div>
+      <h1 class="site-title">AI <span>Security</span> Analyzer</h1>
+    </div>
+    <div class="header-meta">
+      <div class="status-pill"><div class="logo-dot"></div>Powered by Claude</div><br>
+      NIST SP 800-53 Rev 5<br>
+      OPA / Conftest Compatible
+    </div>
+  </header>
+
+  <!-- NIST tags -->
+  <div class="nist-tags" style="margin-bottom: 28px;">
+    <span class="nist-tag">SC-28 Encryption</span>
+    <span class="nist-tag">AC-3 Access Control</span>
+    <span class="nist-tag">AU-2 Logging</span>
+    <span class="nist-tag">CM-8 Inventory</span>
+    <span class="nist-tag">CP-9 Backup</span>
+    <span class="nist-tag">SC-7 Boundary Protection</span>
+    <span class="nist-tag">PM-5 Asset Management</span>
+  </div>
+
+  <!-- Main grid -->
+  <div class="grid">
+
+    <!-- Left: config input -->
+    <div>
+      <div class="panel" style="margin-bottom:20px;">
+        <div class="tabs">
+          <button class="tab active" onclick="loadConfig('insecure',this)">insecure.json</button>
+          <button class="tab" onclick="loadConfig('secure',this)">secure.json</button>
+          <button class="tab" onclick="loadConfig('custom',this)">custom</button>
+        </div>
+        <textarea id="configInput" spellcheck="false"></textarea>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="runScan()" id="scanBtn">
+            <span class="scan-icon">&#9654;</span> Run scan
+          </button>
+          <button class="btn" onclick="clearAll()">Clear</button>
+        </div>
+      </div>
+
+      <!-- About panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">How it works</span>
+        </div>
+        <div class="panel-body" style="font-size:13px;color:var(--muted);line-height:1.7;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--accent);font-family:var(--mono);font-size:11px;min-width:18px;margin-top:2px;">01</span>
+            <span>Paste any cloud storage config JSON into the editor</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--accent);font-family:var(--mono);font-size:11px;min-width:18px;margin-top:2px;">02</span>
+            <span>17 policy rules run instantly against the config</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--accent);font-family:var(--mono);font-size:11px;min-width:18px;margin-top:2px;">03</span>
+            <span>Violations are sent to Claude for AI threat modeling</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--accent);font-family:var(--mono);font-size:11px;min-width:18px;margin-top:2px;">04</span>
+            <span>Get attack paths, business impact, and remediation steps</span>
+          </div>
+          <div style="margin-top:4px;padding-top:12px;border-top:1px solid var(--border);">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">GitHub →&nbsp;</span>
+            <a href="https://github.com/kyoraiq/policy-as-code-compliance-pipeline" target="_blank" style="font-family:var(--mono);font-size:11px;color:var(--accent);text-decoration:none;">kyoraiq/policy-as-code-compliance-pipeline</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: results -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+      <!-- Policy scan results -->
+      <div class="panel results-panel" id="policyResultsPanel">
+        <div class="panel-header">
+          <span class="panel-title">Policy scan</span>
+          <span class="panel-tag" id="violationBadge">—</span>
+        </div>
+        <div id="policyResults">
+          <div class="placeholder">
+            <span class="placeholder-icon">&#9670;</span>
+            Run a scan to see<br>policy violations
+          </div>
+        </div>
+      </div>
+
+      <!-- AI analysis -->
+      <div class="panel ai-panel" id="aiPanel">
+        <div class="panel-header">
+          <span class="panel-title">AI threat model</span>
+          <span class="ai-badge" id="aiBadge">Claude</span>
+        </div>
+        <div id="aiResults">
+          <div class="placeholder">
+            <span class="placeholder-icon">&#11835;</span>
+            AI analysis appears<br>after scan completes
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-left">
+      Policy-as-Code Compliance Pipeline<br>
+      Built with OPA · Conftest · GitHub Actions · Claude AI<br>
+      <a href="https://github.com/kyoraiq/policy-as-code-compliance-pipeline" target="_blank" class="footer-link">View on GitHub ↗</a>
+    </div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-align:right;line-height:1.8;">
+      NIST SP 800-53 Rev 5<br>
+      CIS Benchmark<br>
+      ISO 27001:2022
+    </div>
+  </footer>
+
+</div>
+
+<script>
+const INSECURE = {
+  storage: {
+    resource_type: "cloud_storage_bucket",
+    name: "dev-quicktest-bucket-no-security",
+    region: "us-east-1",
+    created_by: "manual_console",
+    encryption: { enabled: false, algorithm: "NONE", key_management: "none" },
+    public_access: { block_public_acls: false, block_public_policy: false, ignore_public_acls: false, restrict_public_buckets: false },
+    logging: { enabled: false, destination: "", retention_days: 0 },
+    versioning: { enabled: false },
+    cors: { enabled: true, allowed_origins: ["*"] },
+    tags: { environment: "unknown", project: "quick-test" }
+  }
+};
+
+const SECURE = {
+  storage: {
+    resource_type: "cloud_storage_bucket",
+    name: "prod-customer-data-bucket-a1b2c3",
+    region: "us-east-1",
+    created_by: "terraform",
+    encryption: { enabled: true, algorithm: "AES-256", key_management: "customer_managed", kms_key_id: "arn:aws:kms:us-east-1:123456789012:key/mrk-abc123", key_rotation_enabled: true },
+    public_access: { block_public_acls: true, block_public_policy: true, ignore_public_acls: true, restrict_public_buckets: true },
+    logging: { enabled: true, destination: "s3://audit-logs-centralized/prod/", retention_days: 365, log_format: "json" },
+    versioning: { enabled: true, mfa_delete: true },
+    replication: { enabled: true, destination_region: "us-west-2" },
+    tags: { environment: "production", owner: "security-team@company.com", data_classification: "confidential", compliance_scope: "PCI-DSS,HIPAA,SOC2" }
+  }
+};
+
+const CUSTOM = {
+  storage: {
+    resource_type: "cloud_storage_bucket",
+    name: "my-bucket",
+    encryption: { enabled: true, algorithm: "AES-256" },
+    public_access: { block_public_acls: true, block_public_policy: true, ignore_public_acls: true, restrict_public_buckets: true },
+    logging: { enabled: true, destination: "s3://my-logs/", retention_days: 90 },
+    versioning: { enabled: true },
+    tags: { environment: "staging", owner: "my-team@company.com", data_classification: "internal" }
+  }
+};
+
+function loadConfig(type, tabEl) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+  const map = { insecure: INSECURE, secure: SECURE, custom: CUSTOM };
+  document.getElementById('configInput').value = JSON.stringify(map[type], null, 2);
+  document.getElementById('policyResults').innerHTML = '<div class="placeholder"><span class="placeholder-icon">&#9670;</span>Run a scan to see<br>policy violations</div>';
+  document.getElementById('aiResults').innerHTML = '<div class="placeholder"><span class="placeholder-icon">&#11835;</span>AI analysis appears<br>after scan completes</div>';
+  document.getElementById('violationBadge').textContent = '—';
+  document.getElementById('violationBadge').className = 'panel-tag';
+}
+
+loadConfig('insecure', null);
+
+function clearAll() {
+  document.getElementById('configInput').value = '';
+  document.getElementById('policyResults').innerHTML = '<div class="placeholder"><span class="placeholder-icon">&#9670;</span>Run a scan to see<br>policy violations</div>';
+  document.getElementById('aiResults').innerHTML = '<div class="placeholder"><span class="placeholder-icon">&#11835;</span>AI analysis appears<br>after scan completes</div>';
+  document.getElementById('violationBadge').textContent = '—';
+  document.getElementById('violationBadge').className = 'panel-tag';
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i === 0));
+}
+
+function runPolicyChecks(cfg) {
+  const v = [];
+  const s = cfg.storage;
+  if (!s) return [{ control: 'GENERAL', msg: 'No storage block found in config.' }];
+
+  if (!s.encryption) v.push({ control: 'SC-28', msg: 'storage.encryption block is missing.' });
+  else if (!s.encryption.enabled) v.push({ control: 'SC-28', msg: 'Encryption is disabled. Data at rest is stored in plaintext.' });
+  else if (!['AES-256','AES-256-GCM','RSA-4096'].includes(s.encryption.algorithm))
+    v.push({ control: 'SC-28(1)', msg: `Algorithm '${s.encryption.algorithm}' is not approved. Use AES-256 or AES-256-GCM.` });
+
+  if (!s.public_access) v.push({ control: 'AC-3', msg: 'public_access block is missing. Public access settings required.' });
+  else {
+    if (!s.public_access.block_public_acls) v.push({ control: 'AC-3', msg: 'block_public_acls is false. Public ACLs can expose the bucket.' });
+    if (!s.public_access.block_public_policy) v.push({ control: 'AC-6', msg: 'block_public_policy is false. Public bucket policies are permitted.' });
+    if (!s.public_access.ignore_public_acls) v.push({ control: 'SC-7', msg: 'ignore_public_acls is false. Existing public ACLs are honored.' });
+    if (!s.public_access.restrict_public_buckets) v.push({ control: 'SC-7(5)', msg: 'restrict_public_buckets is false. Cross-account public access allowed.' });
+  }
+
+  if (!s.logging) v.push({ control: 'AU-2', msg: 'logging block is missing. Audit configuration required.' });
+  else if (!s.logging.enabled) v.push({ control: 'AU-2', msg: 'Logging is disabled. No audit trail exists for this resource.' });
+  else {
+    if (!s.logging.destination || s.logging.destination === '') v.push({ control: 'AU-9', msg: 'logging.destination is empty. Logs have nowhere to go.' });
+    if (!s.logging.retention_days || s.logging.retention_days < 90)
+      v.push({ control: 'AU-3', msg: `Log retention is ${s.logging.retention_days || 0} days. Minimum required is 90 days.` });
+  }
+
+  if (!s.tags) v.push({ control: 'CM-8', msg: 'tags block is missing. Resource is unidentified.' });
+  else {
+    if (!s.tags.environment) v.push({ control: 'CM-8', msg: 'tags.environment is missing.' });
+    else if (!['production','staging','development','sandbox'].includes(s.tags.environment))
+      v.push({ control: 'CM-8', msg: `Environment tag '${s.tags.environment}' is not a valid value.` });
+    if (!s.tags.owner) v.push({ control: 'CM-8(1)', msg: 'tags.owner is missing. No accountability for this resource.' });
+    if (!s.tags.data_classification) v.push({ control: 'PM-5', msg: 'tags.data_classification is missing.' });
+  }
+
+  if (s.tags && s.tags.environment === 'production') {
+    if (!s.versioning) v.push({ control: 'CP-9', msg: 'versioning block missing for production resource.' });
+    else if (!s.versioning.enabled) v.push({ control: 'CP-9', msg: 'Versioning disabled in production. Data loss is unrecoverable.' });
+  }
+
+  return v;
+}
+
+function runScan() {
+  const input = document.getElementById('configInput').value.trim();
+  let cfg;
+  try {
+    cfg = JSON.parse(input);
+  } catch(e) {
+    document.getElementById('policyResults').innerHTML = `<div class="error-banner">Invalid JSON: ${e.message}</div>`;
+    return;
+  }
+
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="scan-icon">&#9654;</span> Scanning...';
+
+  const violations = runPolicyChecks(cfg);
+  const badge = document.getElementById('violationBadge');
+
+  if (violations.length === 0) {
+    badge.textContent = 'PASS';
+    badge.className = 'success-badge';
+    document.getElementById('policyResults').innerHTML = `
+      <div class="pass-banner fade-in">
+        <div class="pass-icon">&#10003;</div>
+        All 17 policy rules passed — this config is compliant.
+      </div>`;
+    document.getElementById('aiResults').innerHTML = `
+      <div class="pass-banner fade-in" style="color:var(--muted);">
+        <div class="pass-icon" style="color:var(--green);background:var(--green-dim);border-color:rgba(52,211,153,0.3)">&#10003;</div>
+        No violations detected. AI threat modeling not required.
+      </div>`;
+    btn.disabled = false;
+    btn.innerHTML = '<span class="scan-icon">&#9654;</span> Run scan';
+    return;
+  }
+
+  badge.textContent = `${violations.length} violations`;
+  badge.className = 'count-badge';
+
+  let html = `<ul class="violation-list fade-in">`;
+  violations.forEach(v => {
+    html += `<li class="violation-item">
+      <span class="control-tag">${v.control}</span>
+      <span class="violation-msg">${v.msg}</span>
+    </li>`;
+  });
+  html += `</ul>`;
+  document.getElementById('policyResults').innerHTML = html;
+
+  const resourceName = cfg.storage && cfg.storage.name || 'unnamed-resource';
+  const environment = cfg.storage && cfg.storage.tags && cfg.storage.tags.environment || 'unknown';
+
+  document.getElementById('aiResults').innerHTML = `
+    <div class="ai-loading fade-in">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      Sending to Claude for threat analysis...
+    </div>`;
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="scan-icon">&#9654;</span> Run scan';
+
+  callClaude(violations, resourceName, environment);
+}
+
+async function callClaude(violations, resourceName, environment) {
+  const violationText = violations.map(v => `[${v.control}] ${v.msg}`).join('\n');
+
+  const prompt = `You are a senior cloud security architect and threat modeler. A policy scanner found these violations on a cloud storage resource named "${resourceName}" in the "${environment}" environment:\n\n${violationText}\n\nRespond ONLY with a valid JSON object. No markdown, no backticks, no preamble. Use this exact structure:\n{\n  "risk_score": <integer 1-10>,\n  "risk_label": "<Critical|High|Medium|Low>",\n  "summary": "<2 sentence plain-English summary of the overall risk posed by these combined violations>",\n  "attack_paths": [\n    "<specific concrete attack scenario 1 - name real techniques, e.g. S3 bucket enumeration via AWS CLI, credential harvesting from exposed env files>",\n    "<specific attack scenario 2>",\n    "<specific attack scenario 3>"\n  ],\n  "business_impact": [\n    "<concrete business consequence 1 with estimated cost range or specific regulation e.g. GDPR Article 83 fine up to 4% global revenue>",\n    "<business consequence 2>",\n    "<business consequence 3>"\n  ],\n  "top_fixes": [\n    "<most critical fix with the exact config field to change>",\n    "<second fix>",\n    "<third fix>"\n  ]\n}`;
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    const text = (data.content && data.content[0] && data.content[0].text) || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+    renderAI(result);
+  } catch(err) {
+    document.getElementById('aiResults').innerHTML = `<div class="error-banner fade-in">AI analysis unavailable: ${err.message}<br><br>Make sure this page is open inside claude.ai where the API is accessible.</div>`;
+  }
+}
+
+function renderAI(r) {
+  const score = Math.min(10, Math.max(1, r.risk_score));
+  const colors = { Critical: '#ff4d4d', High: '#f59e0b', Medium: '#60a5fa', Low: '#34d399' };
+  const color = colors[r.risk_label] || '#888';
+  const pct = Math.round((score / 10) * 100);
+
+  let html = `<div class="fade-in">`;
+
+  html += `<div class="stats-row">
+    <div class="stat-cell">
+      <span class="stat-num" style="color:${color}">${score}<span style="font-size:14px;color:var(--muted)">/10</span></span>
+      <span class="stat-lbl">Risk score</span>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-num" style="color:${color}">${r.risk_label}</span>
+      <span class="stat-lbl">Severity</span>
+    </div>
+    <div class="stat-cell">
+      <span class="stat-num" style="color:var(--red)">${r.attack_paths ? r.attack_paths.length : 0}</span>
+      <span class="stat-lbl">Attack paths</span>
+    </div>
+  </div>`;
+
+  html += `<div class="risk-section">
+    <div class="risk-header">
+      <span class="risk-label-text">Overall risk</span>
+      <span class="risk-badge" style="background:rgba(${color === '#ff4d4d' ? '255,77,77' : color === '#f59e0b' ? '245,158,11' : color === '#60a5fa' ? '96,165,250' : '52,211,153'},0.12);color:${color};border:1px solid rgba(${color === '#ff4d4d' ? '255,77,77' : color === '#f59e0b' ? '245,158,11' : color === '#60a5fa' ? '96,165,250' : '52,211,153'},0.3)">${r.risk_label}</span>
+    </div>
+    <div class="risk-bar-bg">
+      <div class="risk-bar-fill" style="width:${pct}%;background:${color}"></div>
+    </div>
+    <p class="risk-summary">${r.summary}</p>
+  </div>`;
+
+  html += `<div class="threat-section">
+    <div class="threat-heading">
+      <div class="threat-icon attack">&#9888;</div>
+      <span class="threat-heading-text attack">Attack paths</span>
+    </div>
+    <ul class="threat-list attack">`;
+  r.attack_paths.forEach(a => {
+    html += `<li><div class="threat-bullet"></div><span>${a}</span></li>`;
+  });
+  html += `</ul></div>`;
+
+  html += `<div class="threat-section">
+    <div class="threat-heading">
+      <div class="threat-icon impact">&#36;</div>
+      <span class="threat-heading-text impact">Business impact</span>
+    </div>
+    <ul class="threat-list impact">`;
+  r.business_impact.forEach(b => {
+    html += `<li><div class="threat-bullet"></div><span>${b}</span></li>`;
+  });
+  html += `</ul></div>`;
+
+  html += `<div class="threat-section">
+    <div class="threat-heading">
+      <div class="threat-icon fix">&#10003;</div>
+      <span class="threat-heading-text fix">Remediation steps</span>
+    </div>
+    <ul class="threat-list fix">`;
+  r.top_fixes.forEach(f => {
+    html += `<li><div class="threat-bullet"></div><span>${f}</span></li>`;
+  });
+  html += `</ul></div>`;
+
+  html += `</div>`;
+  document.getElementById('aiResults').innerHTML = html;
+}
+</script>
+
+</body>
+</html>
