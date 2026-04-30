@@ -22,7 +22,7 @@ package cloud.security.storage
 
 # METADATA
 # title: Cloud Storage Security Policy
-# description: Enforces baseline security controls for cloud storage resources
+# description: Enforces baseline security controls...
 # authors:
 #   - DevSecOps Team
 # custom:
