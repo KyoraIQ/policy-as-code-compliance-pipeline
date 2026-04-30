@@ -472,7 +472,7 @@ async function testKey() {
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': keyToTest, 'anthropic-version': '2023-06-01' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': keyToTest, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] })
     });
     const d = await r.json();
@@ -658,7 +658,7 @@ async function callClaude(violations,rname,renv){
   const vtext=violations.map(v=>'['+v.c+'] '+v.m).join('\n');
   const prompt=`You are a senior cloud security architect. Violations found on resource "${rname}" in "${renv}":\n\n${vtext}\n\nRespond ONLY with valid JSON, no markdown:\n{"risk_score":<1-10>,"risk_label":"<Critical|High|Medium|Low>","summary":"<2 sentences>","attack_paths":["<attack with real technique names>","<attack 2>","<attack 3>"],"business_impact":["<impact with regulation/cost>","<impact 2>","<impact 3>"],"top_fixes":["<fix with exact config field>","<fix 2>","<fix 3>"]}`;
   try{
-    const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+    const headers={'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
     if(API_KEY) headers['x-api-key']=API_KEY;
     const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers,body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})});
     const d=await r.json();
